@@ -3,6 +3,30 @@ import requests
 import random
 
 
+def scraped_quotes(base_url, url):
+    data = []
+    while url:
+        r = requests.get(f"{base_url}{url}")
+        soup = BeautifulSoup(r.text, "html.parser")
+        quotes = soup.find_all('div', {'class': 'quote'})
+
+        for quote in quotes:
+            quote_text = quote.find('span', {'class': 'text'}).text
+            quote_author = quote.find('small', {'class': 'author'}).text
+            author_link = quote.find('a')['href']
+            data.append({'quote': quote_text,
+                         'author': quote_author,
+                         'link': author_link})
+
+        next_button = soup.find('li', {'class': 'next'})
+        if next_button:
+            url = next_button.find('a')['href']
+        else:
+            url = ''
+
+    return data
+
+
 def is_right(guess, right_answer):
     if guess.lower() == right_answer.lower():
         print("You guessed correctly!")
@@ -25,28 +49,21 @@ def play_again():
 
 base_url = "http://quotes.toscrape.com"
 url = '/page/1'
-r = requests.get(f"{base_url}{url}")
-soup = BeautifulSoup(r.text, "html.parser")
-quotes = soup.find_all('div', {'class': 'quote'})
 
-data = []
-
-for quote in quotes:
-    quote_text = quote.find('span', {'class': 'text'}).text
-    quote_author = quote.find('small', {'class': 'author'}).text
-    author_link = quote.find('a')['href']
-    data.append({'quote': quote_text,
-                 'author': quote_author,
-                 'link': author_link})
+print('*** WHO SAID THAT? ***')
+print('fetching data... please wait...')
+data = scraped_quotes(base_url, url)
 
 play = True
+count, score = 0, 0
 
 while play:
     chance = 5
+    count += 1
     check = False
     index = random.randrange(0, len(data))
 
-    print(f"Who said this quote?\n{data[index]['quote']}")
+    print(f"\n{count}. Who said this quote?\n{data[index]['quote']}")
     while chance > 0 and not check:
         if chance == 1:
             answer = input(f"You have {chance} remaining guess. ")
@@ -56,7 +73,9 @@ while play:
         check = is_right(answer, data[index]['author'])
         chance -= 1
 
-        if not check:
+        if check:
+            score += 1
+        else:
             if chance == 4:
                 r = requests.get(f"{base_url}{data[index]['link']}")
                 soup = BeautifulSoup(r.text, "html.parser")
@@ -94,8 +113,9 @@ while play:
             else:
                 print(f"You've run out of guesses. The answer is {data[index]['author']}")
 
+    print(f"Score: {score} out of {count}")
     play = play_again()
     if play:
-        print('\nGet ready for the next round...\n')
+        print('\nGet ready for the next round...')
 
 print("Thank you for playing...")
