@@ -1,30 +1,9 @@
 from bs4 import BeautifulSoup
+from csv import DictWriter, DictReader
 import requests
 import random
-
-
-def scraped_quotes(base_url, url):
-    data = []
-    while url:
-        r = requests.get(f"{base_url}{url}")
-        soup = BeautifulSoup(r.text, "html.parser")
-        quotes = soup.find_all('div', {'class': 'quote'})
-
-        for quote in quotes:
-            quote_text = quote.find('span', {'class': 'text'}).text
-            quote_author = quote.find('small', {'class': 'author'}).text
-            author_link = quote.find('a')['href']
-            data.append({'quote': quote_text,
-                         'author': quote_author,
-                         'link': author_link})
-
-        next_button = soup.find('li', {'class': 'next'})
-        if next_button:
-            url = next_button.find('a')['href']
-        else:
-            url = ''
-
-    return data
+import scrape_csv
+import os.path
 
 
 def is_right(guess, right_answer):
@@ -35,10 +14,10 @@ def is_right(guess, right_answer):
         return False
 
 
-def play_again():
+def yes_or_no(game_prompt):
     valid = False
     while not valid:
-        response = input("Would you like to play again (y/n)? ")
+        response = input(game_prompt)
         if response.lower() == 'y':
             return True
         elif response.lower() == 'n':
@@ -47,12 +26,39 @@ def play_again():
             print("Please input a valid response.")
 
 
+def scrape_quotes():
+    print('fetching data... please wait...')
+    data = scrape_csv.scraped_quotes(base_url, url)
+    with open('quotes.csv', 'w', newline='') as file:
+        headers = ['quote', 'author', 'link']
+        csv_writer = DictWriter(file, fieldnames=headers)
+        csv_writer.writeheader()
+        for quote in data:
+            csv_writer.writerow(quote)
+
+
+def read_quotes(filename):
+    with open(filename, 'r') as file:
+        csv_reader = DictReader(file)
+        return list(csv_reader)
+
+
+
 base_url = "http://quotes.toscrape.com"
 url = '/page/1'
 
 print('*** WHO SAID THAT? ***')
-print('fetching data... please wait...')
-data = scraped_quotes(base_url, url)
+
+start_prompt = 'Would you like to update data (y/n)? '
+
+if not os.path.isfile('quotes.csv'):
+    scrape_quotes()
+else:
+    update = yes_or_no(start_prompt)
+    if update:
+        scrape_quotes()
+
+data = read_quotes('quotes.csv')
 
 play = True
 count, score = 0, 0
@@ -114,7 +120,8 @@ while play:
                 print(f"You've run out of guesses. The answer is {data[index]['author']}")
 
     print(f"Score: {score} out of {count}")
-    play = play_again()
+    prompt = "Would you like to play again (y/n)? "
+    play = yes_or_no(prompt)
     if play:
         print('\nGet ready for the next round...')
 
